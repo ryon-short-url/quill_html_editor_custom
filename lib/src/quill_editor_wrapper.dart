@@ -532,7 +532,6 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
          display:none;
         }     
         #scrolling-container {  
-        overflow-y: scroll  !important;
           min-height: ${widget.minHeight}px !important;
           -webkit-user-select: text !important;
          } 
