@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -31,6 +30,7 @@ class QuillHtmlEditor extends StatefulWidget {
     this.hintTextPadding = EdgeInsets.zero,
     this.hintTextAlign = TextAlign.start,
     this.onEditorResized,
+    this.onClicked,
     this.ensureVisible = false,
     this.textStyle = const TextStyle(
       fontStyle: FontStyle.normal,
@@ -84,6 +84,9 @@ class QuillHtmlEditor extends StatefulWidget {
   ///[onEditorCreated] a callback method triggered once the editor is created
   ///it will be called only once after editor is loaded completely
   final VoidCallback? onEditorCreated;
+
+  ///[onClicked] 1 hàm được gọi lại khi có có sự kiến function được click
+  final Function(dynamic)? onClicked;
 
   ///[textStyle] optional style for the default editor text,
   ///while all fields in the style are not mapped;Some basic fields like,
@@ -201,6 +204,13 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
         });
       },
       dartCallBacks: {
+        DartCallback(
+            name: 'OnClickedCallback',
+            callBack: (b) {
+              if (widget.onClicked != null) {
+                widget.onClicked!(b);
+              }
+            }),
         DartCallback(
             name: 'EditorResizeCallback',
             callBack: (height) {
@@ -538,6 +548,13 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
          #scroll-container::-webkit-scrollbar {
             display: none !important; /* For Chrome, Safari, and Opera */
           }
+
+        #copy-menu {
+           background: #f9f9f9;
+           border: 1px solid #ccc;
+           padding: 10px;
+           box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+          }
         </style>
    
         </head>
@@ -568,6 +585,27 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
       
         <!-- Initialize Quill editor -->
         <script>
+        //start
+        // Tạo menu copy
+            var copyMenu = document.createElement("div");
+            copyMenu.id = "copy-menu";
+            copyMenu.style.display = "none";
+            copyMenu.innerHTML = '<button id="copy-button">Tra từ</button>';
+            document.body.appendChild(copyMenu);
+        // Xử lý click event cho button copy
+            document.getElementById("copy-button").addEventListener("click", function(){
+            document.execCommand("copy");
+   
+            if($kIsWeb) {
+                  OnClickedCallback(true);
+                } else {
+                  OnClickedCallback.postMessage(true);
+                }   
+              
+              copyMenu.style.display = "none";
+             
+            });
+        //end
       
             let fullWindowHeight = window.innerHeight;
             let keyboardIsProbablyOpen = false;
@@ -824,17 +862,38 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
                   if(range.length == 0) {
                     var format = quilleditor.getFormat();
                     formatParser(format);
+                    //start
+                    copyMenu.style.display = "none";
+                    //end
                   } else {
                     var format = quilleditor.getFormat(range.index, range.length);
                     formatParser(format);
+                    //Start
+                      showMenuX(range);
+                    //end
                   }
                 } else {
                  // console.log('Cursor not in the editor');
+                 //start
+                  copyMenu.style.display = "none";
+                 //end
                 }
               } catch(e) {
               ///  console.log(e);
               }
             }
+
+          //start custom Function
+          function showMenuX(range){
+           // Hiển thị menu copy khi văn bản được bôi đen
+              copyMenu.style.display = "block";
+              copyMenu.style.position = "absolute";
+              var bounds = quilleditor.getBounds(range.index, range.length);
+           // Đặt vị trí của menu copy ở giữa đoạn văn bản được chọn
+              copyMenu.style.top = (bounds.top - copyMenu.offsetHeight + 72 + window.scrollY) + "px";
+              copyMenu.style.left = (bounds.left + bounds.width / 2 - copyMenu.offsetWidth / 2 + window.scrollX) + "px";
+              }
+            //end custom function
             
              function redo(){
               quilleditor.history.redo();
