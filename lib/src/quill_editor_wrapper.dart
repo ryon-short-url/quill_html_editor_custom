@@ -31,6 +31,7 @@ class QuillHtmlEditor extends StatefulWidget {
     this.hintTextAlign = TextAlign.start,
     this.onEditorResized,
     this.onClicked,
+    this.isShowCustomMenu = false,
     this.ensureVisible = false,
     this.textStyle = const TextStyle(
       fontStyle: FontStyle.normal,
@@ -87,6 +88,10 @@ class QuillHtmlEditor extends StatefulWidget {
 
   ///[onClicked] 1 hàm được gọi lại khi có có sự kiến function được click
   final Function(dynamic)? onClicked;
+
+  ///[isShowCustomMenu] hiển thị hoặc không hiển thị menu khi
+  ///select văn bản
+  final bool? isShowCustomMenu;
 
   ///[textStyle] optional style for the default editor text,
   ///while all fields in the style are not mapped;Some basic fields like,
@@ -548,13 +553,6 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
          #scroll-container::-webkit-scrollbar {
             display: none !important; /* For Chrome, Safari, and Opera */
           }
-
-        #copy-menu {
-           background: #f9f9f9;
-           border: 1px solid #ccc;
-           padding: 10px;
-           box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
-          }
         </style>
    
         </head>
@@ -586,23 +584,84 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
         <!-- Initialize Quill editor -->
         <script>
         //start
-        // Tạo menu copy
-            var copyMenu = document.createElement("div");
-            copyMenu.id = "copy-menu";
-            copyMenu.style.display = "none";
-            copyMenu.innerHTML = '<button id="copy-button">Tra từ</button>';
-            document.body.appendChild(copyMenu);
+        // Tạo menu
+            var customMenu = document.createElement("div");
+            customMenu.id = "custom-menu";
+            customMenu.style.display = "none";
+
+          customMenu.innerHTML = `
+             <div id="tooltip-arrow" style="
+               width: 0;
+               height: 0;
+               border-left: 5px solid transparent;
+               border-right: 5px solid transparent;
+               border-bottom: 5px solid #000;
+               position: absolute;
+               top: -5px;
+               left: calc(50% - 5px);
+             "></div>
+             <div id="menu-buttons" style="
+               display: flex;
+               flex-direction: row;
+               background-color: #000;
+               border-radius: 10px;
+               padding: 5px;
+             ">
+             <button id="copy-button" style="
+               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+               background-color: transparent;
+               color: white;
+               border: none;
+               padding: 5px;
+               border-radius: 2.5px;
+               font-size: 14px;
+               text-align: center;
+               cursor: pointer;
+               outline: none;
+               transition: background-color 0.3s ease;
+             ">
+             Copy
+             </button>
+             <div style="
+               height: 30px;
+               width: 0.5px;
+               background-color: rgba(255, 255, 255, 0.5);
+               margin: 0 2.5px;
+             "></div>
+             <button id="translate-button" style="
+               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+               background-color: transparent;
+               color: white;
+               border: none;
+               padding: 5px;
+               border-radius: 2.5px;
+               font-size: 14px;
+               text-align: center;
+               cursor: pointer;
+               outline: none;
+               transition: background-color 0.3s ease;
+             ">
+             Translate
+             </button>
+            </div>`;
+
+            document.body.appendChild(customMenu);
         // Xử lý click event cho button copy
             document.getElementById("copy-button").addEventListener("click", function(){
             document.execCommand("copy");
-   
+              customMenu.style.display = "none";
+             
+            });
+          // Xử lý click event cho button Translate
+            document.getElementById("translate-button").addEventListener("click", function(){
+          
             if($kIsWeb) {
                   OnClickedCallback(true);
                 } else {
                   OnClickedCallback.postMessage(true);
                 }   
               
-              copyMenu.style.display = "none";
+              customMenu.style.display = "none";
              
             });
         //end
@@ -863,19 +922,21 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
                     var format = quilleditor.getFormat();
                     formatParser(format);
                     //start
-                    copyMenu.style.display = "none";
+                    customMenu.style.display = "none";
                     //end
                   } else {
                     var format = quilleditor.getFormat(range.index, range.length);
                     formatParser(format);
                     //Start
-                      showMenuX(range);
+                    if(${widget.isShowCustomMenu}){
+                      showCustomMenu(range);
+                    }
                     //end
                   }
                 } else {
                  // console.log('Cursor not in the editor');
                  //start
-                  copyMenu.style.display = "none";
+                  customMenu.style.display = "none";
                  //end
                 }
               } catch(e) {
@@ -884,15 +945,30 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
             }
 
           //start custom Function
-          function showMenuX(range){
+          function showCustomMenu(range){
            // Hiển thị menu copy khi văn bản được bôi đen
-              copyMenu.style.display = "block";
-              copyMenu.style.position = "absolute";
+              customMenu.style.display = "block";
+              customMenu.style.position = "absolute";
+
+           // Tìm vị trí của đoạn văn bản được chọn
               var bounds = quilleditor.getBounds(range.index, range.length);
-           // Đặt vị trí của menu copy ở giữa đoạn văn bản được chọn
-              copyMenu.style.top = (bounds.top - copyMenu.offsetHeight + 72 + window.scrollY) + "px";
-              copyMenu.style.left = (bounds.left + bounds.width / 2 - copyMenu.offsetWidth / 2 + window.scrollX) + "px";
-              }
+
+              var newTop =(bounds.top  + 28) + "px";
+              var newLeft= (bounds.left + bounds.width / 2 - customMenu.offsetWidth / 2 + window.scrollX) + "px";
+
+           // Kiểm tra nếu menu đang bị chạm vào mép trái hoặc mép phải của trang, sau đó điều chỉnh vị trí tương ứng
+              var editorRect = quilleditor.container.getBoundingClientRect();
+              if (bounds.left - 45 < 0) {
+                  newLeft = "0px";
+               } else if (bounds.left + bounds.width / 2 + customMenu.offsetWidth > editorRect.right) {
+                     newLeft = (editorRect.right - customMenu.offsetWidth - 4) + "px";
+               }
+
+           // Đặt vị trí của menu copy ở giữa và phía trên đoạn văn bản được chọn
+              customMenu.style.top = newTop;
+              customMenu.style.left = newLeft;
+             
+            }
             //end custom function
             
              function redo(){
