@@ -450,6 +450,11 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
     return await _webviewController.callJsMethod("clearHistory", []);
   }
 
+  /// a private method to clear the history stack
+  Future _scrollToPosition(int? index) async {
+    return await _webviewController.callJsMethod("scrollToPosition", [index]);
+  }
+
   /// This method generated the html code that is required to render the quill js editor
   /// We are rendering this html page with the help of webviewx and using the callbacks to call the quill js apis
   String _getQuillPage({required double width}) {
@@ -984,6 +989,15 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
                quilleditor.history.clear();
                return '';
              }
+             //start
+            function scrollToPosition(index){
+              var range = quilleditor.getBounds(index);
+              console.log(range.top);
+              window.scrollTo(0, range.top);
+              
+              return '';
+             }
+             //end
             
             
             function formatParser(format) {
@@ -1418,6 +1432,11 @@ class QuillEditorController {
   ///  [clearHistory] method to clear the history stack of editor
   void clearHistory() async {
     await _editorKey?.currentState?._clearHistory();
+  }
+
+  ///  [scrollToPosition] scroll To Position
+  Future scrollToPosition(int? index) async {
+    await _editorKey?.currentState?._scrollToPosition(index);
   }
 }
 
