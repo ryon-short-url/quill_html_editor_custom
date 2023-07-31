@@ -38,6 +38,8 @@ class QuillHtmlEditor extends StatefulWidget {
     this.hintTextPadding = EdgeInsets.zero,
     this.hintTextAlign = TextAlign.start,
     this.onEditorResized,
+    this.onClicked,
+    this.isShowCustomMenu = false,
     this.ensureVisible = false,
     this.loadingBuilder,
     this.textStyle = const TextStyle(
@@ -92,6 +94,13 @@ class QuillHtmlEditor extends StatefulWidget {
   ///[onEditorCreated] a callback method triggered once the editor is created
   ///it will be called only once after editor is loaded completely
   final VoidCallback? onEditorCreated;
+
+  ///[onClicked] 1 hàm được gọi lại khi có có sự kiến function được click
+  final Function(dynamic)? onClicked;
+
+  ///[isShowCustomMenu] hiển thị hoặc không hiển thị menu khi
+  ///select văn bản
+  final bool? isShowCustomMenu;
 
   ///[textStyle] optional style for the default editor text,
   ///while all fields in the style are not mapped;Some basic fields like,
@@ -226,6 +235,13 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
         });
       },
       dartCallBacks: {
+        DartCallback(
+            name: 'OnClickedCallback',
+            callBack: (b) {
+              if (widget.onClicked != null) {
+                widget.onClicked!(b);
+              }
+            }),
         DartCallback(
             name: 'EditorResizeCallback',
             callBack: (height) {
@@ -466,6 +482,11 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
     return await _webviewController.callJsMethod("clearHistory", []);
   }
 
+  /// a private method to clear the history stack
+  Future _scrollToPosition(int? index) async {
+    return await _webviewController.callJsMethod("scrollToPosition", [index]);
+  }
+
   /// This method generated the html code that is required to render the quill js editor
   /// We are rendering this html page with the help of webviewx and using the callbacks to call the quill js apis
   String _getQuillPage({required double width}) {
@@ -563,7 +584,6 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
          display:none;
         }     
         #scrolling-container {  
-        overflow-y: scroll  !important;
           min-height: ${widget.minHeight}px !important;
           -webkit-user-select: text !important;
          } 
@@ -600,6 +620,88 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
       
         <!-- Initialize Quill editor -->
         <script>
+        //start
+        // Tạo menu
+            var customMenu = document.createElement("div");
+            customMenu.id = "custom-menu";
+            customMenu.style.display = "none";
+
+          customMenu.innerHTML = `
+             <div id="tooltip-arrow" style="
+               width: 0;
+               height: 0;
+               border-left: 5px solid transparent;
+               border-right: 5px solid transparent;
+               border-bottom: 5px solid #000;
+               position: absolute;
+               top: -5px;
+               left: calc(50% - 5px);
+             "></div>
+             <div id="menu-buttons" style="
+               display: flex;
+               flex-direction: row;
+               background-color: #000;
+               border-radius: 10px;
+               padding: 5px;
+             ">
+             <button id="copy-button" style="
+               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+               background-color: transparent;
+               color: white;
+               border: none;
+               padding: 5px;
+               border-radius: 2.5px;
+               font-size: 14px;
+               text-align: center;
+               cursor: pointer;
+               outline: none;
+               transition: background-color 0.3s ease;
+             ">
+             Copy
+             </button>
+             <div style="
+               height: 30px;
+               width: 0.5px;
+               background-color: rgba(255, 255, 255, 0.5);
+               margin: 0 2.5px;
+             "></div>
+             <button id="translate-button" style="
+               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+               background-color: transparent;
+               color: white;
+               border: none;
+               padding: 5px;
+               border-radius: 2.5px;
+               font-size: 14px;
+               text-align: center;
+               cursor: pointer;
+               outline: none;
+               transition: background-color 0.3s ease;
+             ">
+             Translate
+             </button>
+            </div>`;
+
+            document.body.appendChild(customMenu);
+        // Xử lý click event cho button copy
+            document.getElementById("copy-button").addEventListener("click", function(){
+            document.execCommand("copy");
+              customMenu.style.display = "none";
+             
+            });
+          // Xử lý click event cho button Translate
+            document.getElementById("translate-button").addEventListener("click", function(){
+          
+            if($kIsWeb) {
+                  OnClickedCallback(true);
+                } else {
+                  OnClickedCallback.postMessage(true);
+                }   
+              
+              customMenu.style.display = "none";
+             
+            });
+        //end
       
             let fullWindowHeight = window.innerHeight;
             let keyboardIsProbablyOpen = false;
@@ -869,17 +971,55 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
                   if(range.length == 0) {
                     var format = quilleditor.getFormat();
                     formatParser(format);
+                    //start
+                    customMenu.style.display = "none";
+                    //end
                   } else {
                     var format = quilleditor.getFormat(range.index, range.length);
                     formatParser(format);
+                    //Start
+                    if(${widget.isShowCustomMenu}){
+                      showCustomMenu(range);
+                  }
+                    //end
                   }
                 } else {
                  // console.log('Cursor not in the editor');
+                 //start
+                  customMenu.style.display = "none";
+                 //end
                 }
               } catch(e) {
               ///  console.log(e);
               }
             }
+
+          //start custom Function
+          function showCustomMenu(range){
+           // Hiển thị menu copy khi văn bản được bôi đen
+              customMenu.style.display = "block";
+              customMenu.style.position = "absolute";
+
+           // Tìm vị trí của đoạn văn bản được chọn
+              var bounds = quilleditor.getBounds(range.index, range.length);
+
+              var newTop =(bounds.top  + 28) + "px";
+              var newLeft= (bounds.left + bounds.width / 2 - customMenu.offsetWidth / 2 + window.scrollX) + "px";
+
+           // Kiểm tra nếu menu đang bị chạm vào mép trái hoặc mép phải của trang, sau đó điều chỉnh vị trí tương ứng
+              var editorRect = quilleditor.container.getBoundingClientRect();
+              if (bounds.left - 45 < 0) {
+                  newLeft = "0px";
+               } else if (bounds.left + bounds.width / 2 + customMenu.offsetWidth > editorRect.right) {
+                     newLeft = (editorRect.right - customMenu.offsetWidth - 4) + "px";
+               }
+
+           // Đặt vị trí của menu copy ở giữa và phía trên đoạn văn bản được chọn
+              customMenu.style.top = newTop;
+              customMenu.style.left = newLeft;
+             
+            }
+            //end custom function
             
              function redo(){
               quilleditor.history.redo();
@@ -894,6 +1034,15 @@ class QuillHtmlEditorState extends State<QuillHtmlEditor> {
                quilleditor.history.clear();
                return '';
              }
+             //start
+            function scrollToPosition(index){
+              var range = quilleditor.getBounds(index);
+              console.log(range.top);
+              window.scrollTo(0, range.top);
+            
+              return '';
+             }
+             //end
             
             
             function formatParser(format) {
@@ -1393,6 +1542,11 @@ class QuillEditorController {
   void clearHistory() async {
     await _editorKey?.currentState?._clearHistory();
   }
+
+  ///  [scrollToPosition] scroll To Position
+  Future scrollToPosition(int? index) async {
+    await _editorKey?.currentState?._scrollToPosition(index);
+}
 }
 
 ///[SelectionModel] a model class for selection range
